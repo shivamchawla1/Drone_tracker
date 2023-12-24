@@ -15,8 +15,6 @@ class _LoadingState extends State<Loading> {
     Future.delayed(Duration(milliseconds: 2000), () {
       // Do something
       context.pushReplacement('/place/:id');
-
-
     });
 
   }

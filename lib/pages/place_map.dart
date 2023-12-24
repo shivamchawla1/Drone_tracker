@@ -6,10 +6,8 @@ import 'dart:async';
 import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 import '../services/Get_Positions.dart';
 
 class MapConfiguration {
@@ -118,123 +116,14 @@ class _PlaceMapState extends State<PlaceMap> {
   Future<void> onMapCreated(GoogleMapController controller) async {
     mapController.complete(controller);
     _lastMapPosition = widget.center;
-
-    // Draw initial place markers on creation so that we have something
-    // interesting to look at.
-    var markers = <Marker>{};
-    for (var place in Provider.of<GetPositions>(context, listen: false).places) {
-      markers.add(await _createPlaceMarker(context, place));
-    }
-    setState(() {
-      _markers.addAll(markers);
-    });
-
-    // Zoom to fit the initially selected category.
-    _zoomToFitSelectedCategory();
   }
 
   @override
   void didUpdateWidget(PlaceMap oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Zoom to fit the selected category.
-    if (mounted) {
-      _zoomToFitSelectedCategory();
-    }
   }
 
-  /// Applies zoom to fit the places of the selected category
-  void _zoomToFitSelectedCategory() {
-    _zoomToFitPlaces(
-      _getPlacesForCategory(
-        Provider.of<GetPositions>(context, listen: false).selectedCategory,
-        _markedPlaces.values.toList(),
-      ),
-    );
-  }
 
-  void _cancelAddPlace() {
-    if (_pendingMarker != null) {
-      setState(() {
-        _markers.remove(_pendingMarker);
-        _pendingMarker = null;
-      });
-    }
-  }
-
-  Future<void> _confirmAddPlace(BuildContext context) async {
-    if (_pendingMarker != null) {
-      // Create a new Place and map it to the marker we just added.
-      final appState = Provider.of<GetPositions>(context, listen: false);
-      final newPlace = Place(
-        id: const Uuid().v1(),
-        latLng: _pendingMarker!.position,
-        name: _pendingMarker!.infoWindow.title!,
-        category: appState.selectedCategory,
-      );
-
-      final scaffoldMessenger = ScaffoldMessenger.of(context);
-
-      var placeMarker =
-          await _getPlaceMarkerIcon(context, appState.selectedCategory);
-
-      setState(() {
-        final updatedMarker = _pendingMarker!.copyWith(
-          iconParam: placeMarker,
-          infoWindowParam: InfoWindow(
-            title: 'New Place',
-            snippet: null,
-            onTap: () => context.go('/place/${newPlace.id}'),
-          ),
-          draggableParam: false,
-        );
-
-        _updateMarker(
-          marker: _pendingMarker,
-          updatedMarker: updatedMarker,
-          place: newPlace,
-        );
-
-        _pendingMarker = null;
-      });
-
-      // Show a confirmation snack bar that has an action to edit the new place.
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 3),
-          content:
-              const Text('New place added.', style: TextStyle(fontSize: 16.0)),
-          action: SnackBarAction(
-            label: 'Edit',
-            onPressed: () async {
-              context.go('/place/${newPlace.id}');
-            },
-          ),
-        ),
-      );
-
-      // Add the new place to the places stored in appState.
-      final newPlaces = List<Place>.from(appState.places)..add(newPlace);
-
-      appState.setPlaces(newPlaces);
-    }
-  }
-
-  Future<Marker> _createPlaceMarker(BuildContext context, Place place) async {
-    final marker = Marker(
-      markerId: MarkerId(place.latLng.toString()),
-      position: place.latLng,
-      infoWindow: InfoWindow(
-        title: place.name,
-        snippet: '${place.starRating} Star Rating',
-        onTap: () => context.go('/place/${place.id}'),
-      ),
-      icon: await _getPlaceMarkerIcon(context, place.category),
-      visible: place.category ==
-          Provider.of<GetPositions>(context, listen: false).selectedCategory,
-    );
-    _markedPlaces[marker] = place;
-    return marker;
-  }
 
   Future<void> _watchMapConfigurationChanges() async {
     final appState = context.read<GetPositions>();
@@ -264,39 +153,11 @@ class _PlaceMapState extends State<PlaceMap> {
           }
         }
 
-        await _zoomToFitPlaces(
-          _getPlacesForCategory(
-            newConfiguration.selectedCategory,
-            newConfiguration.places,
-          ),
-        );
       }
       _configuration = newConfiguration;
     }
   }
 
-  Future<void> _onAddPlacePressed() async {
-    setState(() {
-      final newMarker = Marker(
-        markerId: MarkerId(_lastMapPosition.toString()),
-        position: _lastMapPosition!,
-        infoWindow: const InfoWindow(title: 'New Place'),
-        draggable: true,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-      );
-      _markers.add(newMarker);
-      _pendingMarker = newMarker;
-    });
-  }
-
-  void _onToggleMapTypePressed() {
-    final nextType =
-        MapType.values[(_currentMapType.index + 1) % MapType.values.length];
-
-    setState(() {
-      _currentMapType = nextType;
-    });
-  }
 
   Future<void> _showPlacesForSelectedCategory(PlaceCategory category) async {
     setState(() {
@@ -313,17 +174,8 @@ class _PlaceMapState extends State<PlaceMap> {
         );
       }
     });
-
-    await _zoomToFitPlaces(_getPlacesForCategory(
-      category,
-      _markedPlaces.values.toList(),
-    ));
   }
 
-  Future<void> _switchSelectedCategory(PlaceCategory category) async {
-    Provider.of<GetPositions>(context, listen: false).setSelectedCategory(category);
-    await _showPlacesForSelectedCategory(category);
-  }
 
   void _updateExistingPlaceMarker({required Place place}) {
     var marker = _markedPlaces.keys
@@ -380,110 +232,5 @@ class _PlaceMapState extends State<PlaceMap> {
         ),
       );
     });
-  }
-
-  static Future<BitmapDescriptor> _getPlaceMarkerIcon(
-          BuildContext context, PlaceCategory category) =>
-      switch (category) {
-        PlaceCategory.favorite => BitmapDescriptor.fromAssetImage(
-            createLocalImageConfiguration(context, size: const Size.square(32)),
-            'assets/visited.png'),
-        PlaceCategory.visited => BitmapDescriptor.fromAssetImage(
-            createLocalImageConfiguration(context, size: const Size.square(32)),
-            'assets/visited.png'),
-        PlaceCategory.wantToGo => Future.value(BitmapDescriptor.defaultMarker),
-      };
-
-  static List<Place> _getPlacesForCategory(
-      PlaceCategory category, List<Place> places) {
-    return places.where((place) => place.category == category).toList();
-  }
-}
-
-class _AddPlaceButtonBar extends StatelessWidget {
-  final bool visible;
-
-  final VoidCallback onSavePressed;
-  final VoidCallback onCancelPressed;
-
-  const _AddPlaceButtonBar({
-    required this.visible,
-    required this.onSavePressed,
-    required this.onCancelPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Visibility(
-      visible: visible,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 14.0),
-        alignment: Alignment.bottomCenter,
-        child: ButtonBar(
-          alignment: MainAxisAlignment.center,
-          children: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(foregroundColor: Colors.blue),
-              onPressed: onSavePressed,
-              child: const Text(
-                'Save',
-                style: TextStyle(color: Colors.white, fontSize: 16.0),
-              ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(foregroundColor: Colors.red),
-              onPressed: onCancelPressed,
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Colors.white, fontSize: 16.0),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-
-
-class _MapFabs extends StatelessWidget {
-  final bool visible;
-  final VoidCallback onAddPlacePressed;
-  final VoidCallback onToggleMapTypePressed;
-
-  const _MapFabs({
-    required this.visible,
-    required this.onAddPlacePressed,
-    required this.onToggleMapTypePressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      alignment: Alignment.topRight,
-      margin: const EdgeInsets.only(top: 12.0, right: 12.0),
-      child: Visibility(
-        visible: visible,
-        child: Column(
-          children: [
-            FloatingActionButton(
-              heroTag: 'add_place_button',
-              onPressed: onAddPlacePressed,
-              materialTapTargetSize: MaterialTapTargetSize.padded,
-              child: const Icon(Icons.add_location, size: 36.0),
-            ),
-            const SizedBox(height: 12.0),
-            FloatingActionButton(
-              heroTag: 'toggle_map_type_button',
-              onPressed: onToggleMapTypePressed,
-              materialTapTargetSize: MaterialTapTargetSize.padded,
-              mini: true,
-              child: const Icon(Icons.layers, size: 28.0),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
