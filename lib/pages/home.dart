@@ -1,5 +1,7 @@
+import 'package:drone_latest/pages/place_map.dart';
 import 'package:drone_latest/services/Get_Positions.dart';
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 
 class Home extends StatefulWidget {
@@ -20,7 +22,7 @@ class _HomeState extends State<Home> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.blue[900],
+        backgroundColor: Colors.blue,
         title: Text('Drone Tracker'),
         centerTitle: true,
         elevation: 0,
@@ -28,7 +30,7 @@ class _HomeState extends State<Home> {
       body: IndexedStack(
         index: state.viewType == PlaceTrackerViewType.map ? 0 : 1,
         children: const [
-          // PlaceMap(center: LatLng(45.521563, -122.677433)),
+          PlaceMap(center: LatLng(45.521563, -122.677433)),
           // PlaceList()
         ],
       ),

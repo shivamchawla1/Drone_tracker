@@ -14,7 +14,8 @@ class _LoadingState extends State<Loading> {
   void getAllDevices() async {
     Future.delayed(Duration(milliseconds: 2000), () {
       // Do something
-      context.go('/place/:id');
+      context.pushReplacement('/place/:id');
+
 
     });
 
@@ -29,13 +30,13 @@ class _LoadingState extends State<Loading> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.blue,
-      body: Center(
-        child: SpinKitFadingCube(
-          color: Colors.white,
-          size: 50.0,
+        backgroundColor: Colors.blue,
+        body: Center(
+            child: SpinKitFadingCube(
+              color: Colors.white,
+              size: 50.0,
+            )
         )
-      )
     );
   }
 }
