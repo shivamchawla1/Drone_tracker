@@ -3,26 +3,21 @@
 // found in the LICENSE file.
 
 import 'dart:async';
-import 'dart:math';
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:provider/provider.dart';
-import '../services/Get_Positions.dart';
+import '../Models/Get_Positions.dart';
 
 class MapConfiguration {
   final List<Place> places;
 
-  final PlaceCategory selectedCategory;
-
   const MapConfiguration({
     required this.places,
-    required this.selectedCategory,
   });
 
   @override
-  int get hashCode => places.hashCode ^ selectedCategory.hashCode;
+  int get hashCode => places.hashCode ;
 
   @override
   bool operator ==(Object other) {
@@ -35,14 +30,12 @@ class MapConfiguration {
     }
 
     return other is MapConfiguration &&
-        other.places == places &&
-        other.selectedCategory == selectedCategory;
+        other.places == places;
   }
 
   static MapConfiguration of(GetPositions getPositions) {
     return MapConfiguration(
       places: getPositions.places,
-      selectedCategory: getPositions.selectedCategory,
     );
   }
 }
@@ -79,18 +72,15 @@ class _PlaceMapState extends State<PlaceMap> {
   void initState() {
     super.initState();
     getLocationUpdates();
-    context.read<GetPositions>().addListener(_watchMapConfigurationChanges);
   }
 
   @override
   void dispose() {
-    context.read<GetPositions>().removeListener(_watchMapConfigurationChanges);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    _watchMapConfigurationChanges();
     var state = Provider.of<GetPositions>(context, listen: true);
     return Builder(builder: (context) {
       // We need this additional builder here so that we can pass its context to
@@ -129,6 +119,7 @@ class _PlaceMapState extends State<PlaceMap> {
   void didUpdateWidget(PlaceMap oldWidget) {
     super.didUpdateWidget(oldWidget);
   }
+
   Future<void> getLocationUpdates() async {
     bool _serviceEnabled;
     PermissionStatus _permissionGranted;
@@ -164,113 +155,4 @@ class _PlaceMapState extends State<PlaceMap> {
     await controller.animateCamera(CameraUpdate.newCameraPosition(_newCameraPosition));
   }
 
-
-  Future<void> _watchMapConfigurationChanges() async {
-    final appState = context.read<GetPositions>();
-    _configuration ??= MapConfiguration.of(appState);
-    final newConfiguration = MapConfiguration.of(appState);
-
-    // Since we manually update [_configuration] when place or selectedCategory
-    // changes come from the [place_map], we should only enter this if statement
-    // when returning to the [place_map] after changes have been made from
-    // [place_list].
-    if (_configuration != newConfiguration) {
-      if (_configuration!.places == newConfiguration.places &&
-          _configuration!.selectedCategory !=
-              newConfiguration.selectedCategory) {
-        // If the configuration change is only a category change, just update
-        // the marker visibilities.
-        await _showPlacesForSelectedCategory(newConfiguration.selectedCategory);
-      } else {
-        // At this point, we know the places have been updated from the list
-        // view. We need to reconfigure the map to respect the updates.
-        for (final place in newConfiguration.places) {
-          final oldPlace =
-              _configuration!.places.firstWhereOrNull((p) => p.id == place.id);
-          if (oldPlace == null || oldPlace != place) {
-            // New place or updated place.
-            _updateExistingPlaceMarker(place: place);
-          }
-        }
-
-      }
-      _configuration = newConfiguration;
-    }
-  }
-
-
-  Future<void> _showPlacesForSelectedCategory(PlaceCategory category) async {
-    setState(() {
-      for (var marker in List.of(_markedPlaces.keys)) {
-        final place = _markedPlaces[marker]!;
-        final updatedMarker = marker.copyWith(
-          visibleParam: place.category == category,
-        );
-
-        _updateMarker(
-          marker: marker,
-          updatedMarker: updatedMarker,
-          place: place,
-        );
-      }
-    });
-  }
-
-
-  void _updateExistingPlaceMarker({required Place place}) {
-    var marker = _markedPlaces.keys
-        .singleWhere((value) => _markedPlaces[value]!.id == place.id);
-
-    setState(() {
-      final updatedMarker = marker.copyWith(
-        infoWindowParam: InfoWindow(
-          title: place.name,
-          snippet:
-              place.starRating != 0 ? '${place.starRating} Star Rating' : null,
-        ),
-      );
-      _updateMarker(marker: marker, updatedMarker: updatedMarker, place: place);
-    });
-  }
-
-  void _updateMarker({
-    required Marker? marker,
-    required Marker updatedMarker,
-    required Place place,
-  }) {
-    _markers.remove(marker);
-    _markedPlaces.remove(marker);
-
-    _markers.add(updatedMarker);
-    _markedPlaces[updatedMarker] = place;
-  }
-
-  Future<void> _zoomToFitPlaces(List<Place> places) async {
-    var controller = await mapController.future;
-
-    // Default min/max values to latitude and longitude of center.
-    var minLat = widget.center!.latitude;
-    var maxLat = widget.center!.latitude;
-    var minLong = widget.center!.longitude;
-    var maxLong = widget.center!.longitude;
-
-    for (var place in places) {
-      minLat = min(minLat, place.latitude);
-      maxLat = max(maxLat, place.latitude);
-      minLong = min(minLong, place.longitude);
-      maxLong = max(maxLong, place.longitude);
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      controller.animateCamera(
-        CameraUpdate.newLatLngBounds(
-          LatLngBounds(
-            southwest: LatLng(minLat, minLong),
-            northeast: LatLng(maxLat, maxLong),
-          ),
-          48.0,
-        ),
-      );
-    });
-  }
 }

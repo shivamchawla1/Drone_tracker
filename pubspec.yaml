@@ -42,6 +42,13 @@ dependencies:
   uuid: ^3.0.4
   go_router: ^7.0.0
   location : ^5.0.0
+  web_socket_channel: any
+  dio: ^5.3.3
+  latlong2: ^0.8.0
+  meta: ^1.1.6
+  pedantic: ^1.8.0
+  extra_pedantic: ^1.1.1+3
+  geopoint: ^1.0.0
 
 dev_dependencies:
   flutter_test:
