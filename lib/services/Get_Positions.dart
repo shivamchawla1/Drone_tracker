@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class GetPositions extends ChangeNotifier {
+
   GetPositions({
     this.places = StubData.places,
     this.selectedCategory = PlaceCategory.favorite,

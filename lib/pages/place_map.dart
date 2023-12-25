@@ -7,6 +7,7 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:location/location.dart';
 import 'package:provider/provider.dart';
 import '../services/Get_Positions.dart';
 
@@ -61,21 +62,23 @@ class PlaceMap extends StatefulWidget {
 class _PlaceMapState extends State<PlaceMap> {
   Completer<GoogleMapController> mapController = Completer();
 
+  Location _locationController = new Location();
+
   MapType _currentMapType = MapType.normal;
 
   LatLng? _lastMapPosition;
+  LatLng? _currentPosition = null;
 
   final Map<Marker, Place> _markedPlaces = <Marker, Place>{};
 
   final Set<Marker> _markers = {};
-
-  Marker? _pendingMarker;
 
   MapConfiguration? _configuration;
 
   @override
   void initState() {
     super.initState();
+    getLocationUpdates();
     context.read<GetPositions>().addListener(_watchMapConfigurationChanges);
   }
 
@@ -95,16 +98,20 @@ class _PlaceMapState extends State<PlaceMap> {
       // SnackBar and to do this, we need a build context that has Scaffold as
       // an ancestor.
       return Center(
-        child: Stack(
+        child: _currentPosition == null ?
+        const Text("Loading..") :
+        Stack(
           children: [
             GoogleMap(
-              onMapCreated: onMapCreated,
+              onMapCreated: ((GoogleMapController controller) => mapController.complete(controller)),
               initialCameraPosition: CameraPosition(
-                target: widget.center!,
-                zoom: 11.0,
+                target: _currentPosition!,
+                zoom: 15.0,
               ),
               mapType: _currentMapType,
-              markers: _markers,
+              markers: {
+                Marker(markerId:  MarkerId("_currentLocation"),icon: BitmapDescriptor.defaultMarker , position: _currentPosition!)
+              },
               onCameraMove: (position) => _lastMapPosition = position.target,
             ),
           ],
@@ -122,7 +129,40 @@ class _PlaceMapState extends State<PlaceMap> {
   void didUpdateWidget(PlaceMap oldWidget) {
     super.didUpdateWidget(oldWidget);
   }
+  Future<void> getLocationUpdates() async {
+    bool _serviceEnabled;
+    PermissionStatus _permissionGranted;
 
+    _serviceEnabled = await _locationController.serviceEnabled();
+
+    if (_serviceEnabled) {
+      _serviceEnabled = await _locationController.requestService();
+    } else{
+      return;
+    }
+    _permissionGranted = await _locationController.hasPermission();
+    if (_permissionGranted == PermissionStatus.denied) {
+      _permissionGranted = await _locationController.requestPermission();
+      if (_permissionGranted != PermissionStatus.granted) {
+        return;
+      }
+    }
+    _locationController.onLocationChanged.listen((LocationData currentLocation) {
+      if (currentLocation.longitude != null && currentLocation.latitude != null) {
+        setState(() {
+          _currentPosition = LatLng(currentLocation.latitude!, currentLocation.longitude!);
+          _cameraToPosition(_currentPosition!);
+
+        });
+      }
+
+    });
+  }
+  Future<void> _cameraToPosition(LatLng pos) async {
+    final GoogleMapController controller = await mapController.future;
+    CameraPosition _newCameraPosition = CameraPosition(target: pos , zoom: 15.0);
+    await controller.animateCamera(CameraUpdate.newCameraPosition(_newCameraPosition));
+  }
 
 
   Future<void> _watchMapConfigurationChanges() async {
