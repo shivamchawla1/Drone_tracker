@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:provider/provider.dart';
 import '../Models/Get_Positions.dart';
+import '../Utils/Utils.dart';
 
 class MapConfiguration {
   final List<Place> places;
@@ -54,7 +56,7 @@ class PlaceMap extends StatefulWidget {
 
 class _PlaceMapState extends State<PlaceMap> {
   Completer<GoogleMapController> mapController = Completer();
-
+  BitmapDescriptor? markerIcon;
   Location _locationController = new Location();
 
   MapType _currentMapType = MapType.normal;
@@ -100,7 +102,7 @@ class _PlaceMapState extends State<PlaceMap> {
               ),
               mapType: _currentMapType,
               markers: {
-                Marker(markerId:  MarkerId("_currentLocation"),icon: BitmapDescriptor.defaultMarker , position: _currentPosition!)
+                Marker(markerId:  MarkerId("_currentLocation"),icon:  markerIcon ?? BitmapDescriptor.defaultMarker , position: _currentPosition!)
               },
               onCameraMove: (position) => _lastMapPosition = position.target,
             ),
@@ -137,6 +139,10 @@ class _PlaceMapState extends State<PlaceMap> {
       if (_permissionGranted != PermissionStatus.granted) {
         return;
       }
+    }
+    final bytes = await getBytesFromAsset('assets/drone_marker.png', 80);
+    if (bytes != null) {
+      markerIcon = BitmapDescriptor.fromBytes(bytes);
     }
     _locationController.onLocationChanged.listen((LocationData currentLocation) {
       if (currentLocation.longitude != null && currentLocation.latitude != null) {
